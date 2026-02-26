@@ -107,12 +107,6 @@ Description and goals.
 
 ## States
 
-### Default Set
-```
-TODO → IN-PROGRESS → DONE
-```
-
-### Full Set (enable via config.yaml)
 ```
 TODO → NEXT → IN-PROGRESS → WAITING / BLOCKED → DONE / CANCELLED
 ```
@@ -123,6 +117,8 @@ TODO → NEXT → IN-PROGRESS → WAITING / BLOCKED → DONE / CANCELLED
 - Any open → any open: allowed
 - Any open → closed: allowed
 - Closed → open: ask user to confirm reopening
+- WAITING: task is paused pending an external response. Record what it's waiting for.
+- BLOCKED: task cannot proceed due to a dependency. Record the blocker.
 
 ## Priority Levels
 
@@ -178,6 +174,51 @@ Render the Inbox view.
 
 ### `/search <query>`
 Search across all files in `tasks/`, `inbox/`, `projects/`, `notes/` for the query. Show matching items with context snippets.
+
+### `/week`
+Render the Week view. Show tasks organised by day for the current Mon–Sun week, plus unscheduled high-priority items at the bottom.
+
+### `/agenda [days]`
+Render the Agenda view. Show a day-by-day lookahead for N days (default: 7). Each day lists items due or scheduled on that date. Also show overdue items at the top.
+
+### `/project <name>`
+Render the Project view. Look up the project by name/slug in `projects/`, then find all tasks matching the project's tags or `project:` field. Group by status.
+
+### `/overdue`
+Show all open tasks past their due date, sorted by how late they are (most overdue first).
+
+### `/waiting`
+Show all WAITING and BLOCKED tasks with the reason/context for each.
+
+### `/dashboard`
+High-level overview: task counts by status, overdue count, inbox count, upcoming deadlines (next 7 days).
+
+### `/block <task ref> <reason>`
+1. Resolve task reference
+2. Set `status: BLOCKED`
+3. Add a note in the body: `- {date}: BLOCKED — {reason}`
+4. Confirm
+
+### `/wait <task ref> <reason>`
+1. Resolve task reference
+2. Set `status: WAITING`
+3. Add a note in the body: `- {date}: WAITING — {reason}`
+4. Confirm
+
+### `/defer <task ref> <date>`
+1. Resolve task reference
+2. Update `due` and/or `scheduled` to the new date
+3. Confirm with old and new dates
+
+### `/priority <task ref> <level>`
+1. Resolve task reference
+2. Set `priority` to the given level (must be one of: critical, high, medium, low)
+3. Confirm
+
+### `/tag <task ref> <tags>`
+1. Resolve task reference
+2. Add the given tag(s) to the task's `tags` list (don't duplicate existing tags)
+3. Confirm
 
 ## Task Resolution
 
@@ -264,6 +305,173 @@ If inbox is empty: "Inbox is clear. Use `/quick` to capture ideas."
 
 Search across file content and front matter. Show most relevant results first. Include archived items only if explicitly requested.
 
+### `/week`
+
+```
+═══════════════════════════════════════════════════
+  📅 WEEK — {start date} – {end date}
+═══════════════════════════════════════════════════
+
+  Monday {DD}
+  ──────────
+  1. [ ] {title}                   pri: {level}  #{tags}
+
+  Tuesday {DD}
+  ──────────
+  2. [!] {title}                   due: {date}   #{tags}
+
+  ...
+
+  ⚡ UNSCHEDULED HIGH PRIORITY
+  ──────────
+  8. [ ] {title}                   pri: high     #{tags}
+
+═══════════════════════════════════════════════════
+```
+
+- Show Mon–Sun of current week
+- Place tasks on their `due` or `scheduled` date (prefer `scheduled` if both exist)
+- Omit days with no items
+- Show completed tasks with [✓] if completed this week (for a sense of progress)
+- "Unscheduled high priority" = tasks with priority high or critical and no due/scheduled date
+
+### `/agenda [days]`
+
+```
+═══════════════════════════════════════════════════
+  📅 AGENDA — {N} days ({start} – {end})
+═══════════════════════════════════════════════════
+
+  🔴 OVERDUE
+  ──────────
+  1. [!] {title}                   due: {date} ({N}d late)  #{tags}
+
+  {Weekday} {DD} {Month}
+  ──────────
+  2. [ ] {title}                   pri: {level}  #{tags}
+
+  {Weekday} {DD} {Month}
+  ──────────
+  3. [ ] {title}                   pri: {level}  #{tags}
+
+═══════════════════════════════════════════════════
+```
+
+- Default lookahead: 7 days. User can specify: `/agenda 14`
+- Show overdue at top, then day-by-day
+- Place tasks on `due` or `scheduled` date
+- Omit days with no items
+
+### `/project <name>`
+
+```
+═══════════════════════════════════════════════════
+  📁 PROJECT — {Project Title}
+═══════════════════════════════════════════════════
+
+  🔵 IN PROGRESS
+  ──────────
+  1. [~] {title}                   #{tags}
+
+  📋 TODO
+  ──────────
+  2. [ ] {title}                   pri: {level}  #{tags}
+  3. [ ] {title}                   pri: {level}  #{tags}
+
+  ⏳ WAITING / BLOCKED
+  ──────────
+  4. [⏳] {title}                  waiting: {reason}
+
+  ✅ DONE
+  ──────────
+  5. [✓] {title}                   completed: {relative}
+
+═══════════════════════════════════════════════════
+```
+
+- Find project in `projects/` by name or slug (fuzzy match)
+- Match tasks: `project:` field matches, OR task tags overlap with project tags
+- Group by status category: in-progress → todo → waiting/blocked → done
+- Sort each group by priority
+- If project not found, suggest available projects
+
+### `/overdue`
+
+```
+═══════════════════════════════════════════════════
+  🔴 OVERDUE — {n} items
+═══════════════════════════════════════════════════
+
+  1. [!] {title}                   due: {date} ({N}d late)  pri: {level}  #{tags}
+  2. [!] {title}                   due: {date} ({N}d late)  pri: {level}  #{tags}
+
+═══════════════════════════════════════════════════
+```
+
+- Show all open tasks where `due` < today
+- Sort by staleness (most overdue first), then priority
+- Show how many days late each task is
+- If none: "Nothing overdue. Nice work."
+
+### `/waiting`
+
+```
+═══════════════════════════════════════════════════
+  ⏳ WAITING & BLOCKED — {n} items
+═══════════════════════════════════════════════════
+
+  WAITING
+  ──────────
+  1. [⏳] {title}                  #{tags}
+     └─ {reason from notes}       since: {relative}
+
+  BLOCKED
+  ──────────
+  2. [🚫] {title}                  #{tags}
+     └─ {reason from notes}       since: {relative}
+
+═══════════════════════════════════════════════════
+```
+
+- Show all tasks with status WAITING or BLOCKED
+- Extract the reason from the most recent WAITING/BLOCKED note in the task body
+- Show how long the task has been in this state (from the note timestamp or last modified)
+- If none: "Nothing waiting or blocked."
+
+### `/dashboard`
+
+```
+═══════════════════════════════════════════════════
+  📊 DASHBOARD
+═══════════════════════════════════════════════════
+
+  Status            Count
+  ─────────────────────────
+  TODO                {n}
+  NEXT                {n}
+  IN-PROGRESS         {n}
+  WAITING             {n}
+  BLOCKED             {n}
+  ─────────────────────────
+  Total open          {n}
+
+  🔴 Overdue:  {n}
+  📬 Inbox:    {n}
+
+  📅 Upcoming Deadlines (7 days)
+  ──────────
+  {date}  {title}                   pri: {level}
+  {date}  {title}                   pri: {level}
+
+═══════════════════════════════════════════════════
+```
+
+- Count tasks by status across `tasks/`
+- Count inbox items from `inbox/`
+- Count overdue = open tasks with `due` < today
+- Show next 7 days of deadlines sorted by date
+- Omit status rows with zero count
+
 ## Natural Language
 
 Respond to natural language as well as slash commands.
@@ -274,18 +482,25 @@ Respond to natural language as well as slash commands.
 
 ### Query Patterns
 - "What am I working on?" → show IN-PROGRESS tasks
-- "What's due this week?" → filter by due date within current week
-- "What's overdue?" → filter for past-due open tasks
-- "Show me everything tagged X" → filter by tag
+- "What's due this week?" → `/week`
+- "What's overdue?" → `/overdue`
+- "Show me everything tagged X" / "Show me the X stuff" → filter by tag
 - "What did I do today/yesterday?" → show items completed in that period
+- "Show me the X project" / "How's X going?" → `/project X`
+- "What's blocking me?" / "What am I waiting on?" → `/waiting`
+- "Give me an overview" / "How am I doing?" → `/dashboard`
+- "What's coming up?" / "What's the next 2 weeks look like?" → `/agenda 14`
+- "I've got 2 hours, what should I focus on?" → show highest-priority TODO items sorted by urgency
 
 ### Modification Patterns
 - "Mark X as done" / "X is done" / "Finished X" → `/done`
 - "Start working on X" → `/start`
-- "Push X to next week" / "Defer X to Monday" → update `scheduled`/`due`
-- "Make X high priority" → update priority
-- "Tag X with Y" → add tag
-- "X is blocked by Y" → set `status: BLOCKED`, note reason
+- "Push X to next week" / "Defer X to Monday" → `/defer`
+- "Make X high priority" / "Bump X up" → `/priority`
+- "Tag X with Y" → `/tag`
+- "X is blocked by Y" / "X is blocked, waiting on Y" → `/block`
+- "I'm waiting on Y for X" / "X is on hold until Y" → `/wait`
+- "Unblock X" / "X isn't blocked any more" → set status back to TODO or IN-PROGRESS (ask which if unclear)
 
 ### Inference Rules
 - Match mentions against known tags from config (e.g., "HAProxy" → `#haproxy`)
@@ -330,9 +545,9 @@ Read `.clorg/config.yaml` for overrides. Defaults if missing:
 
 ```yaml
 states:
-  default: [TODO, IN-PROGRESS, DONE]
-open_states: [TODO, IN-PROGRESS]
-closed_states: [DONE]
+  default: [TODO, NEXT, IN-PROGRESS, WAITING, BLOCKED, DONE, CANCELLED]
+open_states: [TODO, NEXT, IN-PROGRESS, WAITING, BLOCKED]
+closed_states: [DONE, CANCELLED]
 priorities: [critical, high, medium, low]
 default_priority: medium
 tags: []

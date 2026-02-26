@@ -3,12 +3,11 @@
 
 # Task state sequences
 states:
-  default: [TODO, IN-PROGRESS, DONE]
-  # full: [TODO, NEXT, IN-PROGRESS, WAITING, BLOCKED, DONE, CANCELLED]
+  default: [TODO, NEXT, IN-PROGRESS, WAITING, BLOCKED, DONE, CANCELLED]
 
 # Which states count as "open" vs "closed"
-open_states: [TODO, IN-PROGRESS]
-closed_states: [DONE]
+open_states: [TODO, NEXT, IN-PROGRESS, WAITING, BLOCKED]
+closed_states: [DONE, CANCELLED]
 
 # Priority levels (highest to lowest)
 priorities: [critical, high, medium, low]
