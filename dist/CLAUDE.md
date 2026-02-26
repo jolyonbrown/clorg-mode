@@ -53,7 +53,9 @@ estimate: "2h"           # optional
 clocked: "0m"            # optional, total time logged
 clock_started: ""        # optional, ISO 8601 timestamp when clock is running
 clock_log: []            # optional, list of {start, end, duration} entries
-blocked_by: []           # optional
+blocked_by: []           # optional, list of task IDs this task depends on
+recur: ""               # optional: daily, weekly, monthly, "every 2 weeks", "weekdays"
+recur_after: schedule   # optional: "schedule" (fixed date) or "completion" (N days after done)
 ---
 
 # Task Title
@@ -288,6 +290,148 @@ Automated housekeeping:
 Manually archive a specific task, or run auto-archive:
 - With task ref: move that task to `archive/YYYY/MM/`, regardless of age
 - Without argument: same as the archive step in `/cleanup`
+
+### `/recur <task ref> <pattern>`
+Set a task to recur:
+1. Resolve task reference
+2. Set `recur` field to the pattern: `daily`, `weekly`, `monthly`, `weekdays`, `"every 2 weeks"`, etc.
+3. Optionally set `recur_after`: `schedule` (default — next instance on fixed interval from due date) or `completion` (next instance N days after completion)
+4. Confirm
+
+### `/deps <task ref>`
+Show the dependency chain for a task:
+1. Resolve task reference
+2. Read its `blocked_by` list
+3. Recursively resolve each blocker's own `blocked_by`
+4. Render a tree showing the full chain and status of each dependency
+
+### `/log [date]`
+View or generate a daily log:
+- With date (or "today", "yesterday"): show/generate log for that date
+- Without argument: today
+- Read from `logs/daily/YYYY-MM-DD.md` if it exists; otherwise generate it on the fly from task data and timesheet
+
+### `/export <format> [period]`
+Export data for reporting:
+- `timesheet` — export `logs/timesheet.csv` filtered to period, or copy for use in invoicing
+- `summary` — generate a markdown weekly/monthly summary: tasks completed, time by project, highlights
+- `tasks` — export all open tasks as a formatted markdown list
+
+## Recurring Tasks
+
+When a recurring task is marked DONE (via `/done`):
+1. Archive the completed instance as normal
+2. Create a new task with the same title, tags, project, priority, and estimate
+3. Calculate the next due date:
+   - **`recur_after: schedule`** — advance from the original `due` date by the recurrence interval (e.g., weekly = +7 days). If the original due date has passed, advance to the next future occurrence.
+   - **`recur_after: completion`** — advance from today by the interval
+4. Set the new task's status to `TODO`, clear `clocked` and `clock_log`
+5. Confirm: "Recurring task created: {title}, next due: {date}"
+
+### Recurrence Patterns
+- `daily` — every day
+- `weekdays` — Mon–Fri
+- `weekly` — every 7 days
+- `every 2 weeks` / `fortnightly` — every 14 days
+- `monthly` — same day of month (or last day if month is shorter)
+- `quarterly` — every 3 months
+- `yearly` / `annual` — every year
+
+## Task Dependencies
+
+Tasks can depend on other tasks via the `blocked_by` field (list of task IDs).
+
+### Rules
+- When all tasks in `blocked_by` are DONE or CANCELLED, the dependency is satisfied
+- When rendering a task with unsatisfied dependencies, show a `🔗 blocked by: {blocker titles}` line
+- `/done` on a blocker should check if any other tasks were waiting on it. If so, notify: "This unblocks: {task titles}. Set them to TODO?"
+- `/deps` shows a tree view of the full dependency chain
+
+### Setting Dependencies
+- `/block <task> by <other task>` — add other task's ID to `blocked_by`, set status to BLOCKED
+- "Task A depends on Task B" / "A is blocked by B" → resolve both, add dependency
+- "What depends on this?" → show tasks that have this task in their `blocked_by`
+
+## Project Progress
+
+Enhance the `/project` view with a progress section:
+
+```
+  📊 Progress
+  ──────────
+  Tasks:  3/8 done (37%)  ████░░░░░░
+  Time:   12h30m logged   (est: 20h)
+
+  Open by priority:
+    critical: 1  high: 2  medium: 2
+```
+
+- Calculate completion % from done tasks vs total
+- Show time logged vs total estimates (if estimates exist)
+- Show open task count by priority
+
+## Daily Log
+
+Auto-generate daily summaries at `logs/daily/YYYY-MM-DD.md`:
+
+```markdown
+---
+date: "YYYY-MM-DD"
+type: daily-log
+---
+
+# Daily Log — {Weekday} {DD} {Month} {YYYY}
+
+## Completed
+- [✓] {task title} ({time clocked})
+
+## In Progress
+- [~] {task title} ({time clocked today})
+
+## Time Logged
+Total: {total}h
+- {project}: {hours}
+- {project}: {hours}
+
+## Notes
+(auto-populated from task notes added today)
+```
+
+- Generate when `/log` is called, or auto-generate at end of day if tasks were modified
+- If the file already exists, update it rather than overwrite
+
+## Export Formats
+
+### `/export summary [period]`
+Generate a markdown summary suitable for a blog post, standup, or status report:
+
+```markdown
+# Week of 24 February 2026
+
+## Completed (5 tasks)
+- Fix HAProxy connection timeout · nhs-spine · 3h15m
+- Migrate Splunk dashboards · nhs-spine · 4h30m
+...
+
+## In Progress (2 tasks)
+- Upgrade HAProxy to 2.9 · BLOCKED · waiting on firewall
+...
+
+## Time: 22h15m across 3 projects
+- nhs-spine: 18h
+- blog: 3h15m
+- personal: 1h
+
+## Next Week
+- Check LDAP replication logs (critical, due Fri)
+...
+```
+
+### `/export timesheet [period]`
+Output the timesheet CSV data for the period, formatted for easy copy-paste into invoicing tools. Group by project with subtotals.
+
+### `/export tasks`
+Export all open tasks as a clean markdown list, grouped by project then priority.
 
 ## Clock Stop Procedure
 
@@ -649,6 +793,20 @@ Respond to natural language as well as slash commands.
 - "Process the inbox" / "Let's triage" / "What's in my inbox?" → `/triage` (or `/inbox` if just viewing)
 - "Clean up" / "Archive old stuff" / "Tidy up" → `/cleanup`
 - "Archive that" / "Archive the done tasks" → `/archive`
+
+### Recurring & Dependency Patterns
+- "Make X a weekly task" / "X repeats every Monday" → `/recur X weekly`
+- "X recurs daily" / "This is a daily task" → `/recur X daily`
+- "X depends on Y" / "X is blocked by Y" / "Can't do X until Y is done" → add dependency
+- "What depends on X?" / "What does X unblock?" → show dependents
+- "Show the dependency chain for X" → `/deps X`
+
+### Log & Export Patterns
+- "What did I do today?" / "Show my log" → `/log today`
+- "What did I get done yesterday?" → `/log yesterday`
+- "Export my timesheet for this month" → `/export timesheet this month`
+- "Write a summary of this week" / "Generate a status report" → `/export summary this week`
+- "List all my open tasks" → `/export tasks`
 
 ### Inference Rules
 - Match mentions against known tags from config (e.g., "HAProxy" → `#haproxy`)
