@@ -1,0 +1,23 @@
+# clorg-mode configuration
+# Customise your workflow here. All fields are optional — defaults are in CLAUDE.md.
+
+# Task state sequences
+states:
+  default: [TODO, IN-PROGRESS, DONE]
+  # full: [TODO, NEXT, IN-PROGRESS, WAITING, BLOCKED, DONE, CANCELLED]
+
+# Which states count as "open" vs "closed"
+open_states: [TODO, IN-PROGRESS]
+closed_states: [DONE]
+
+# Priority levels (highest to lowest)
+priorities: [critical, high, medium, low]
+default_priority: medium
+
+# Known tags (for consistency and auto-matching)
+tags: []
+
+# Archive settings
+archive:
+  auto_archive_after_days: 7
+  archive_path: archive/

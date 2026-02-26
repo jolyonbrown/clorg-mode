@@ -1,0 +1,1 @@
+Initialise the clorg-mode directory structure. Create all required directories (inbox/, tasks/, projects/, archive/, notes/, logs/, logs/daily/, views/), the default config.yaml, and template files. Follow the /init specification in CLAUDE.md.
