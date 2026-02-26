@@ -50,7 +50,9 @@ scheduled: "YYYY-MM-DD"  # optional
 tags: [tag1, tag2]
 project: "project-slug"  # optional
 estimate: "2h"           # optional
-clocked: "0m"            # optional
+clocked: "0m"            # optional, total time logged
+clock_started: ""        # optional, ISO 8601 timestamp when clock is running
+clock_log: []            # optional, list of {start, end, duration} entries
 blocked_by: []           # optional
 ---
 
@@ -152,19 +154,23 @@ Fast capture to `inbox/`:
 
 ### `/done <task ref>`
 1. Resolve task reference (see Task Resolution)
-2. Set `status: DONE`, add note with completion date
-3. Confirm with task title
+2. If clock is running (`clock_started` is set), stop it first (see Clock Stop procedure)
+3. Set `status: DONE`, add note with completion date
+4. Confirm with task title and total time clocked (if any)
 
 ### `/start <task ref>`
 1. Resolve task reference
-2. Set `status: IN-PROGRESS`
-3. Confirm
+2. If another task has a running clock, stop that clock first (see Clock Stop procedure) but leave its status as IN-PROGRESS
+3. Set `status: IN-PROGRESS`
+4. Set `clock_started` to current ISO 8601 timestamp
+5. Confirm, noting the clock is now running
 
 ### `/stop`
-1. Find task(s) with status `IN-PROGRESS`
-2. If one: set to `TODO`, confirm
+1. Find task(s) with `clock_started` set (clock running)
+2. If one: run Clock Stop procedure, set status to `TODO`, confirm with duration logged
 3. If multiple: list them, ask which one
-4. If none: say so
+4. If none running: find IN-PROGRESS task(s), set to `TODO`, confirm
+5. If nothing at all: say so
 
 ### `/today`
 Render the Today view (see Views below).
@@ -220,6 +226,56 @@ High-level overview: task counts by status, overdue count, inbox count, upcoming
 2. Add the given tag(s) to the task's `tags` list (don't duplicate existing tags)
 3. Confirm
 
+### `/clock <task ref> <duration>`
+Manual time entry — add time without starting/stopping a clock:
+1. Resolve task reference
+2. Parse duration: "45m", "1h30m", "2 hours", "90 minutes"
+3. Add a `clock_log` entry with today's date (no start/end times, just duration)
+4. Update `clocked` total
+5. Append row to `logs/timesheet.csv`
+6. Confirm with task title and new total
+
+### `/timesheet [period]`
+Render the Timesheet view. Period options:
+- (no argument) → today
+- `today` → today
+- `yesterday` → yesterday
+- `this week` → current Mon–Sun
+- `last week` → previous Mon–Sun
+- `this month` / `February` → calendar month
+- `YYYY-MM-DD` to `YYYY-MM-DD` → custom range
+
+## Clock Stop Procedure
+
+When stopping a clock (used by `/stop`, `/done`, `/start` on a different task):
+1. Read `clock_started` from the task's front matter
+2. Calculate elapsed time: now minus `clock_started`
+3. Round to nearest N minutes (default: 5, configurable via `time_tracking.round_to_minutes`)
+4. Add entry to `clock_log`: `{start, end, duration}`
+5. Update `clocked` total (sum of all clock_log durations)
+6. Remove `clock_started` field (or set to empty)
+7. Append a row to `logs/timesheet.csv`
+
+### Timesheet CSV Format
+
+File: `logs/timesheet.csv`. Create with header row if it doesn't exist.
+
+```csv
+date,task_id,task_title,project,start,end,duration_minutes,tags
+2026-02-26,20260226-100000,Migrate Splunk dashboards,nhs-spine,10:00,11:15,75,nhs;splunk
+```
+
+- `date`: YYYY-MM-DD
+- `start`/`end`: HH:MM (local time), or empty for manual entries
+- `duration_minutes`: integer
+- `tags`: semicolon-separated
+
+### Duration Formatting
+
+- Under 60 minutes: `45m`
+- 60+ minutes: `1h15m`
+- Exact hours: `2h`
+
 ## Task Resolution
 
 When a command references a task, resolve in this order:
@@ -252,7 +308,7 @@ Use unicode box-drawing and emoji for clean, scannable terminal output. Omit any
 
   🔵 IN PROGRESS
   ──────────
-  3. [~] {title}                   started: {relative}
+  3. [~] {title}                   ⏱ {clocked}  🔴 clocking
 
   🟢 SCHEDULED TODAY
   ──────────
@@ -471,6 +527,41 @@ Search across file content and front matter. Show most relevant results first. I
 - Count overdue = open tasks with `due` < today
 - Show next 7 days of deadlines sorted by date
 - Omit status rows with zero count
+- Show time clocked today and this week (from `logs/timesheet.csv`)
+
+### `/timesheet [period]`
+
+```
+═══════════════════════════════════════════════════
+  ⏱ TIMESHEET — {period description}
+═══════════════════════════════════════════════════
+
+  By Project              Hours
+  ─────────────────────────────
+  nhs-spine               4h30m
+  (no project)            1h15m
+  ─────────────────────────────
+  Total                   5h45m
+
+  By Day
+  ──────────
+  Mon 24    2h15m   ████████░░░░  (target: 6h)
+  Tue 25    3h30m   ████████████  (target: 6h)
+
+  Detail
+  ──────────
+  1. Migrate Splunk dashboards      1h15m   #nhs #splunk
+  2. Fix HAProxy timeout            2h00m   #nhs #haproxy
+  3. Write blog post                1h15m   #blog
+
+═══════════════════════════════════════════════════
+```
+
+- Read from `logs/timesheet.csv`, filtered to the requested period
+- Group by project for summary, then by day with progress bars against daily target
+- Show individual task totals in detail section
+- Progress bar: each `█` = 30 minutes, `░` = remaining to target
+- If no time logged in period: "No time logged for {period}."
 
 ## Natural Language
 
@@ -501,6 +592,13 @@ Respond to natural language as well as slash commands.
 - "X is blocked by Y" / "X is blocked, waiting on Y" → `/block`
 - "I'm waiting on Y for X" / "X is on hold until Y" → `/wait`
 - "Unblock X" / "X isn't blocked any more" → set status back to TODO or IN-PROGRESS (ask which if unclear)
+
+### Time Tracking Patterns
+- "Clock 45 minutes against X" / "Log 2 hours on X" → `/clock`
+- "I spent 2 hours on X this morning" → `/clock` (infer duration)
+- "How much time did I spend on X?" → show `clocked` total for that task
+- "How much time this week?" / "Show my timesheet" → `/timesheet this week`
+- "How's my time today?" → `/timesheet today`
 
 ### Inference Rules
 - Match mentions against known tags from config (e.g., "HAProxy" → `#haproxy`)
@@ -554,4 +652,7 @@ tags: []
 archive:
   auto_archive_after_days: 7
   archive_path: archive/
+time_tracking:
+  round_to_minutes: 5
+  daily_target_hours: 6
 ```

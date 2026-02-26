@@ -20,3 +20,8 @@ tags: []
 archive:
   auto_archive_after_days: 7
   archive_path: archive/
+
+# Time tracking
+time_tracking:
+  round_to_minutes: 5
+  daily_target_hours: 6
