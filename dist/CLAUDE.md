@@ -245,6 +245,50 @@ Render the Timesheet view. Period options:
 - `this month` / `February` → calendar month
 - `YYYY-MM-DD` to `YYYY-MM-DD` → custom range
 
+### `/review`
+Weekly review — an interactive walkthrough that cleans up and recalibrates the system. Walk through each section in order, pausing for the user's input before moving on:
+
+1. **Overdue items** — List each. For each, ask: reschedule, complete, or cancel?
+2. **Stale in-progress** — Tasks IN-PROGRESS for 3+ days with no recent notes. For each, ask: still working? blocked? done?
+3. **Waiting/Blocked** — List each. Ask: any updates? can we unblock?
+4. **Completed this week** — Show tasks marked DONE this week. This is a morale boost — celebrate it.
+5. **Time summary** — Hours logged by project this week vs daily target. Read from `logs/timesheet.csv`.
+6. **Upcoming deadlines** — Next 7 days. Anything need prep work?
+7. **Unscheduled high-priority** — Tasks with priority high/critical but no `due`/`scheduled` date. Should these get dates?
+8. **Inbox check** — Show inbox count. Offer to run `/triage` if items exist.
+
+Present each section with a clear header. After the user responds to each, apply the changes and move to the next section. At the end, show a brief summary of all changes made.
+
+### `/triage`
+Interactive inbox processing — walk through `inbox/` items one by one:
+
+For each item:
+1. Show the title
+2. Ask: **Project?** (suggest based on keywords, or "none")
+3. Ask: **Priority?** (suggest based on urgency cues, default medium)
+4. Ask: **Due date?** (suggest if context implies one, or "none")
+5. Ask: **Tags?** (suggest based on keywords and known tags)
+6. Move the file from `inbox/` to `tasks/`, updating front matter with full metadata
+7. Set status from `INBOX` to `TODO`
+8. Confirm, then move to next item
+
+Keep it conversational and fast. Accept short answers: "nhs-spine", "high", "Friday", "nhs, spine". If the user says "skip", leave the item in inbox. If "delete", remove it.
+
+After all items processed (or user says "done"), show summary: N items triaged, N skipped, N deleted.
+
+### `/cleanup`
+Automated housekeeping:
+
+1. **Archive completed tasks** — Find DONE/CANCELLED tasks in `tasks/` older than `archive.auto_archive_after_days` (default: 7 days). Move each to `archive/YYYY/MM/{filename}`, creating directories as needed.
+2. **Flag stale in-progress** — Tasks IN-PROGRESS for 5+ days with no recent notes. List them and suggest: update, block, or complete?
+3. **Flag stale waiting** — Tasks WAITING/BLOCKED for 14+ days. List them and suggest: chase up, reschedule, or cancel?
+4. **Report** — Show summary: N tasks archived, N stale items flagged.
+
+### `/archive [task ref]`
+Manually archive a specific task, or run auto-archive:
+- With task ref: move that task to `archive/YYYY/MM/`, regardless of age
+- Without argument: same as the archive step in `/cleanup`
+
 ## Clock Stop Procedure
 
 When stopping a clock (used by `/stop`, `/done`, `/start` on a different task):
@@ -600,6 +644,12 @@ Respond to natural language as well as slash commands.
 - "How much time this week?" / "Show my timesheet" → `/timesheet this week`
 - "How's my time today?" → `/timesheet today`
 
+### Workflow Patterns
+- "Let's do a review" / "Weekly review" / "Time to review" → `/review`
+- "Process the inbox" / "Let's triage" / "What's in my inbox?" → `/triage` (or `/inbox` if just viewing)
+- "Clean up" / "Archive old stuff" / "Tidy up" → `/cleanup`
+- "Archive that" / "Archive the done tasks" → `/archive`
+
 ### Inference Rules
 - Match mentions against known tags from config (e.g., "HAProxy" → `#haproxy`)
 - "urgent" / "ASAP" → priority: critical
@@ -617,6 +667,19 @@ After displaying any view, remember the numbered items. When the user refers to:
 - "all of them" → all displayed items
 
 Context resets when a new view is displayed.
+
+## Smart Suggestions
+
+When rendering views, proactively surface useful nudges (keep them brief — one line appended to the view):
+
+- **Stale in-progress:** If a task has been IN-PROGRESS for 3+ days with no recent notes, append: `⚠ {title} has been in progress for {N} days — update or /block?`
+- **Long-waiting:** If a task has been WAITING/BLOCKED for 14+ days: `⚠ {title} has been waiting for {N} days — chase up or reschedule?`
+- **Inbox piling up:** If inbox has 5+ items: `📬 Your inbox has {N} items — run /triage?`
+- **No time logged today:** If it's after noon and no timesheet entries for today: `⏱ No time logged today — /start a task?`
+- **Weekly review due:** If it's Friday (or Monday) and no review has been done this week (check for a note or log): `📋 Weekly review time? Run /review`
+- **Overdue in other views:** When showing any view that isn't `/today` or `/overdue`, if there are overdue items, add a one-line reminder at the bottom.
+
+These should be subtle — at the bottom of the view, not interruptive. Never show more than 2 suggestions at once.
 
 ## Implementation Notes
 
