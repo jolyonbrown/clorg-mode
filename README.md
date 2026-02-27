@@ -40,7 +40,7 @@ claude
 
   🔴 OVERDUE
   ──────────
-  1. [!] Fix Spine auth error logging     due: Tue 24 (2d late)  #nhs
+  1. [!] Fix API gateway auth error logging  due: Tue 24 (2d late)  #backend
 
   🟡 DUE TODAY
   ──────────
@@ -108,7 +108,7 @@ You don't need slash commands. Just talk:
 - *"What's blocking me?"*
 - *"The HAProxy task is done"*
 - *"Push the blog post to next week"*
-- *"How much time did I spend on NHS stuff this week?"*
+- *"How much time did I spend on infrastructure this week?"*
 - *"Clock 45 minutes against the Splunk task"*
 - *"Start the first one"* (after viewing a list)
 
@@ -123,8 +123,8 @@ title: "Fix HAProxy connection timeout issue"
 status: IN-PROGRESS
 priority: high
 due: "2025-02-28"
-tags: [nhs, infrastructure, haproxy]
-project: nhs-spine
+tags: [backend, infrastructure, haproxy]
+project: api-platform
 clocked: "2h15m"
 ---
 

@@ -47,9 +47,9 @@ Claude infers priority from "urgent" (→ critical), the due date from "by Frida
 When you just want to jot something down without thinking about metadata:
 
 ```
-> /quick Check if Spine auth errors correlate with LDAP cert expiry
+> /quick Check if API gateway auth errors correlate with LDAP cert expiry
 
-  📬 Captured: Check if Spine auth errors correlate with LDAP cert expiry
+  📬 Captured: Check if API gateway auth errors correlate with LDAP cert expiry
 ```
 
 This lands in your inbox for later triage.
@@ -266,7 +266,7 @@ When you `/start` a task, the clock starts. When you `/stop`, `/done`, or start 
 ### Creating a project
 
 ```
-> /add a project for NHS Spine Infrastructure, tags nhs and infrastructure
+> /add a project for API Platform Infrastructure, tags backend and infrastructure
 ```
 
 This creates a file in `projects/` that groups related tasks.
@@ -274,10 +274,10 @@ This creates a file in `projects/` that groups related tasks.
 ### Viewing a project
 
 ```
-> /project nhs-spine
+> /project api-platform
 
 ═══════════════════════════════════════════════════
-  📁 PROJECT — NHS Spine Infrastructure
+  📁 PROJECT — API Platform Infrastructure
 ═══════════════════════════════════════════════════
 
   📊 Progress
@@ -312,19 +312,19 @@ Quick captures land in your inbox with no metadata. Process them when you're rea
   📬 TRIAGE — 1 item to process
 ═══════════════════════════════════════════════════
 
-  "Check if Spine auth errors correlate with LDAP cert expiry"
+  "Check if API gateway auth errors correlate with LDAP cert expiry"
 
-  Project?  (suggest: nhs-spine)
+  Project?  (suggest: api-platform)
   Priority? (suggest: medium)
   Due date? (suggest: none)
-  Tags?     (suggest: nhs, spine, ldap)
+  Tags?     (suggest: backend, api, ldap)
 ```
 
 ```
-> nhs-spine, high, this Friday, nhs spine ldap
+> api-platform, high, this Friday, backend api ldap
 
-  ✓ Created task: Check if Spine auth errors correlate with LDAP cert expiry
-    project: nhs-spine · pri: high · due: Fri 28 · #nhs #spine #ldap
+  ✓ Created task: Check if API gateway auth errors correlate with LDAP cert expiry
+    project: api-platform · pri: high · due: Fri 28 · #backend #api #ldap
 
   ── TRIAGE COMPLETE ─────────────────────────────
   1 item triaged, 0 skipped, 0 deleted
@@ -355,7 +355,7 @@ Tasks can depend on other tasks:
 ```
 > the auth error task depends on the HAProxy upgrade
 
-  ✓ Dependency set: Check Spine auth errors → blocked by: Upgrade HAProxy to 2.9
+  ✓ Dependency set: Check API gateway auth errors → blocked by: Upgrade HAProxy to 2.9
 ```
 
 When you complete a blocker, clorg-mode tells you what it unblocks:
@@ -364,7 +364,7 @@ When you complete a blocker, clorg-mode tells you what it unblocks:
 > /done the HAProxy upgrade
 
   ✓ Done: Upgrade HAProxy to 2.9
-  🔓 This unblocks: Check Spine auth errors. Set to TODO?
+  🔓 This unblocks: Check API gateway auth errors. Set to TODO?
 ```
 
 View the full chain:
@@ -373,10 +373,10 @@ View the full chain:
 > /deps the auth error task
 
 ═══════════════════════════════════════════════════
-  🔗 DEPENDENCIES — Check Spine auth errors
+  🔗 DEPENDENCIES — Check API gateway auth errors
 ═══════════════════════════════════════════════════
 
-  Check Spine auth errors [BLOCKED]
+  Check API gateway auth errors [BLOCKED]
   └─ 🔗 blocked by:
      └─ Upgrade HAProxy to 2.9 [IN-PROGRESS]
 
@@ -470,7 +470,7 @@ states:
 
 # Known tags (for auto-matching)
 tags:
-  - nhs
+  - backend
   - infrastructure
   - haproxy
   - splunk
